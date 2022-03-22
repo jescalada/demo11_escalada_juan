@@ -1,3 +1,20 @@
+var currentUser;
+firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+        currentUser = db.collection("users").doc(user.uid);   //global
+        console.log(currentUser);
+
+        // the following functions are always called when someone is logged in
+        read_display_Quote();
+        insertName();
+        populateCardsDynamically();
+    } else {
+        // No user is signed in.
+        console.log("No user is signed in");
+        window.location.href = "login.html";
+    }
+});
+
 //----------------------------------------------------------
 // This is a function that gets called everytime the page loads
 // to display a quote of the day.  At the moment, it only displays
@@ -14,30 +31,21 @@ function read_display_Quote(){
         document.getElementById("quote-goes-here").innerHTML=tuesdayDoc.data().quote;
     })
 }
-read_display_Quote();
 
 //---------------------------------------------------------------------------
 // This is a function that gets called everytime the page loads.
 // It is meant to get the name of the user who is logged in, and insert it 
 // on the page for a warm welcome. 
 //---------------------------------------------------------------------------
-function insertName(){
-// to check if the user is logged in:
- firebase.auth().onAuthStateChanged(user =>{
-     if (user){
-         console.log(user.uid); // let me to know who is the user that logged in to get the UID
-        currentUser = db.collection("users").doc(user.uid); // will to to the firestore and go to the document of the user
-        currentUser.get().then(userDoc=>{
-            //get the user name
-            var user_Name= userDoc.data().name;
-            console.log(user_Name);
-            $("#name-goes-here").text(user_Name); //jquery
-            // document.getElementByID("name-goes-here").innetText=user_Name;
-        })    
-    }
- })
+function insertName() {
+    currentUser.get().then(userDoc => {
+        //get the user name
+        var user_Name = userDoc.data().name;
+        console.log(user_Name);
+        $("#name-goes-here").text(user_Name); //jquery
+        // document.getElementByID("name-goes-here").innetText=user_Name;
+    })
 }
-insertName();
 
 //--------------------------------------------------------------------------
 // This is a function that we call only ONE time, to populate the database.
@@ -95,20 +103,44 @@ function populateCardsDynamically() {
                 var hikeID = doc.data().id; //gets the unique ID field
                 var hikeLength = doc.data().length; //gets the length field
                 let testHikeCard = hikeCardTemplate.content.cloneNode(true);
+
                 testHikeCard.querySelector('.card-title').innerHTML = hikeName;
                 testHikeCard.querySelector('.card-length').innerHTML = hikeLength;
                 testHikeCard.querySelector('a').onclick = () => setHikeData(hikeID);
+                
+                testHikeCard.querySelector('i').id = 'save-' + hikeID;
+                testHikeCard.querySelector('i').onclick = () => saveBookmark(hikeID);
                 testHikeCard.querySelector('img').src = `./images/${hikeID}.jpg`;
+                testHikeCard.querySelector('.read-more').href = "eachHike.html?hikeName="+hikeName +"&id=" + hikeID;
+                
                 hikeCardGroup.appendChild(testHikeCard);
             })
 
         })
 }
-populateCardsDynamically();
 
 //--------------------------------------------------------------
 // This function saves the current hikeID into the localStorage
 //--------------------------------------------------------------
 function setHikeData(id){
     localStorage.setItem ('hikeID', id);
+}
+
+//-----------------------------------------------------------------------------
+// This function is called whenever the user clicks on the "bookmark" icon.
+// It adds the hike to the "bookmarks" array
+// Then it will change the bookmark icon from the hollow to the solid version. 
+//-----------------------------------------------------------------------------
+function saveBookmark(hikeID) {
+    currentUser.set({
+            bookmarks: firebase.firestore.FieldValue.arrayUnion(hikeID)
+        }, {
+            merge: true
+        })
+        .then(function () {
+            console.log("bookmark has been saved for: " + currentUser);
+            var iconID = 'save-' + hikeID;
+            //console.log(iconID);
+            document.getElementById(iconID).innerText = 'bookmark';
+        });
 }
